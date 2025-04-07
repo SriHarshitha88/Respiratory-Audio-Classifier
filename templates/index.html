@@ -1,1 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Respiratory Sound Analysis</title>
+    <script src="https://unpkg.com/wavesurfer.js@6.6.3"></script>
+    <script src="https://unpkg.com/wavesurfer.js@6.6.3/dist/plugin/wavesurfer.regions.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body { font-family: sans-serif; }
+        #waveform { border: 1px solid #ddd; margin-bottom: 1em; }
+        #predictions { margin-top: 1em; }
+        .region-crackle { background-color: rgba(255, 0, 0, 0.3); } /* Red for crackles */
+        .region-wheeze { background-color: rgba(0, 0, 255, 0.3); } /* Blue for wheezes */
+        .chart-container { width: 45%; display: inline-block; margin-top: 1em; }
+    </style>
+</head>
+<body>
 
+    <h1>Abnormal Respiratory Sound Detector</h1>
+    
+    <!-- Step progress bar -->
+    <div class="step-container">
+        <div class="stepper">
+            <div class="step active" id="step1">
+                <div class="step-number">1</div>
+                <div class="step-title">Upload Recording</div>
+            </div>
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div class="step-title">Analysis</div>
+            </div>
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <div class="step-title">Results</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Step 1: Upload -->
+    <div class="step-content active" id="step1-content">
+        <h3>Upload a Respiratory Sound Recording</h3>
+        <p>Select an audio file (.wav format) of a respiratory recording to analyze for the presence of crackles and wheezes.</p>
+        
+        <div>
+            <label for="audioFile">Select Audio File:</label>
+            <input type="file" id="audioFile" accept="audio/*">
+            
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">Upload a .wav file containing respiratory sounds. Best results with clear recordings.</span>
+            </div>
+        </div>
+        
+        <div>
+            <label for="patientIdInput">Patient ID (optional):</label>
+            <input type="text" id="patientIdInput" placeholder="e.g., 101, 102...">
+            
+            <div class="tooltip">
+                <div class="tooltip-icon">?</div>
+                <span class="tooltip-text">Enter the patient ID to get diagnosis information. IDs range from 101-226 in our database.</span>
+            </div>
+        </div>
+        
+        <button id="nextToAnalysisButton" disabled>Next: Analyze</button>
+    </div>
+    
+    <!-- Step 2: Analysis -->
+    <div class="step-content" id="step2-content">
+        <h3>Audio Analysis</h3>
+        <p>Review the waveform below and click "Start Analysis" when ready.</p>
+        
+        <div id="waveform"></div>
+        <div id="controls">
+            <button id="playPauseButton" disabled>Play/Pause</button>
+            <button id="analyzeButton" disabled>Start Analysis</button>
+        </div>
+        
+        <div id="analysis-progress" style="display: none;">
+            <div class="spinner"></div>
+            <span class="progress-message">Processing audio...</span>
+        </div>
+        
+        <button id="backToUploadButton">Back</button>
+    </div>
+    
+    <!-- Step 3: Results -->
+    <div class="step-content" id="step3-content">
+        <h3>Analysis Results</h3>
+        
+        <!-- Diagnosis Info (shown if available) -->
+        <div id="diagnosis-container" style="display: none;">
+            <div class="diagnosis-info">
+                <div class="diagnosis-title">Patient Diagnosis Information</div>
+                <div class="diagnosis-details">
+                    <div class="diagnosis-stat">
+                        <div class="diagnosis-stat-label">Patient ID:</div>
+                        <div class="diagnosis-stat-value" id="patient-id-display">-</div>
+                    </div>
+                    <div class="diagnosis-stat">
+                        <div class="diagnosis-stat-label">Diagnosis:</div>
+                        <div class="diagnosis-stat-value" id="diagnosis-display">-</div>
+                    </div>
+                </div>
+                <div id="diagnosis-stats-container" style="display: none;">
+                    <h4>Condition Statistics</h4>
+                    <div class="diagnosis-details">
+                        <div class="diagnosis-stat">
+                            <div class="diagnosis-stat-label">Crackles Prevalence:</div>
+                            <div class="diagnosis-stat-value" id="crackles-prevalence">-</div>
+                        </div>
+                        <div class="diagnosis-stat">
+                            <div class="diagnosis-stat-label">Wheezes Prevalence:</div>
+                            <div class="diagnosis-stat-value" id="wheezes-prevalence">-</div>
+                        </div>
+                        <div class="diagnosis-stat">
+                            <div class="diagnosis-stat-label">Sample Size:</div>
+                            <div class="diagnosis-stat-value" id="sample-count">-</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results Summary -->
+        <div class="results-summary">
+            <div class="summary-title">Overall Results:</div>
+            <div class="summary-row">
+                <div class="summary-label">Average Crackles Probability:</div>
+                <div class="summary-value" id="avg-crackles">-</div>
+            </div>
+            <div class="summary-row">
+                <div class="summary-label">Average Wheezes Probability:</div>
+                <div class="summary-value" id="avg-wheezes">-</div>
+            </div>
+            <div class="summary-row">
+                <div class="summary-label">Maximum Crackles Probability:</div>
+                <div class="summary-value" id="max-crackles">-</div>
+            </div>
+            <div class="summary-row">
+                <div class="summary-label">Maximum Wheezes Probability:</div>
+                <div class="summary-value" id="max-wheezes">-</div>
+            </div>
+        </div>
+        
+        <h3>Detailed Segment Analysis</h3>
+        <p>The timeline below shows detected abnormal segments. Red regions indicate crackles, and blue regions indicate wheezes.</p>
+        
+        <div id="predictions">
+            <!-- Prediction results will be shown here -->
+        </div>
+        
+        <button id="backToAnalysisButton">Back to Analysis</button>
+        <button id="newAnalysisButton">Start New Analysis</button>
+    </div>
+
+    <h2>Dataset Insights</h2>
+    
+    <div id="charts-container">
+        <div class="chart-container">
+            <canvas id="locationChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="equipmentChart"></canvas>
+        </div>
+        
+        <!-- New diagnosis chart -->
+        <div class="chart-container" style="width: 92%;">
+            <canvas id="diagnosisChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        // Elements
+        const audioFileInput = document.getElementById('audioFile');
+        const patientIdInput = document.getElementById('patientIdInput');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const predictionsDiv = document.getElementById('predictions');
+        const nextToAnalysisButton = document.getElementById('nextToAnalysisButton');
+        const backToUploadButton = document.getElementById('backToUploadButton');
+        const backToAnalysisButton = document.getElementById('backToAnalysisButton');
+        const newAnalysisButton = document.getElementById('newAnalysisButton');
+        const analysisProgress = document.getElementById('analysis-progress');
+        
+        // Step elements
+        const step1 = document.getElementById('step1');
+        const step2 = document.getElementById('step2');
+        const step3 = document.getElementById('step3');
+        const step1Content = document.getElementById('step1-content');
+        const step2Content = document.getElementById('step2-content');
+        const step3Content = document.getElementById('step3-content');
+        
+        // Result elements
+        const diagnosisContainer = document.getElementById('diagnosis-container');
+        const diagnosisStatsContainer = document.getElementById('diagnosis-stats-container');
+        const patientIdDisplay = document.getElementById('patient-id-display');
+        const diagnosisDisplay = document.getElementById('diagnosis-display');
+        const cracklesPrevalence = document.getElementById('crackles-prevalence');
+        const wheezesPrevalence = document.getElementById('wheezes-prevalence');
+        const sampleCount = document.getElementById('sample-count');
+        const avgCrackles = document.getElementById('avg-crackles');
+        const avgWheezes = document.getElementById('avg-wheezes');
+        const maxCrackles = document.getElementById('max-crackles');
+        const maxWheezes = document.getElementById('max-wheezes');
+
+        let wavesurfer = null;
+        let currentAudioFile = null;
+
+        // Initialize WaveSurfer
+        wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: 'violet',
+            progressColor: 'purple',
+            plugins: [
+                WaveSurfer.regions.create()
+            ]
+        });
+
+        // Step Navigation
+        function goToStep(stepNumber) {
+            // Update steps
+            document.querySelectorAll('.step').forEach(step => step.classList.remove('active', 'completed'));
+            document.querySelectorAll('.step-content').forEach(content => content.classList.remove('active'));
+            
+            for (let i = 1; i < stepNumber; i++) {
+                document.getElementById(`step${i}`).classList.add('completed');
+            }
+            document.getElementById(`step${stepNumber}`).classList.add('active');
+            document.getElementById(`step${stepNumber}-content`).classList.add('active');
+        }
+        
+        // Format probability as percentage with color coding
+        function formatProbability(prob) {
+            const percentage = Math.round(prob * 100);
+            let className = 'low';
+            if (percentage > 70) {
+                className = 'high';
+            } else if (percentage > 30) {
+                className = 'medium';
+            }
+            return `<span class="${className}">${percentage}%</span>`;
+        }
+
+        // Step 1 - File Upload
+        audioFileInput.addEventListener('change', (event) => {
+            currentAudioFile = event.target.files[0];
+            if (currentAudioFile) {
+                nextToAnalysisButton.disabled = false;
+            } else {
+                nextToAnalysisButton.disabled = true;
+            }
+        });
+        
+        nextToAnalysisButton.addEventListener('click', () => {
+            if (currentAudioFile) {
+                goToStep(2);
+                playPauseButton.disabled = true;
+                analyzeButton.disabled = false;
+                predictionsDiv.innerHTML = '';
+                wavesurfer.empty();
+                wavesurfer.regions.clear();
+                wavesurfer.load(URL.createObjectURL(currentAudioFile));
+            }
+        });
+        
+        // Step 2 - Analysis
+        wavesurfer.on('ready', () => {
+            playPauseButton.disabled = false;
+        });
+
+        playPauseButton.addEventListener('click', () => {
+            wavesurfer.playPause();
+        });
+        
+        backToUploadButton.addEventListener('click', () => {
+            goToStep(1);
+        });
+
+        // Step 3 - Results Navigation
+        backToAnalysisButton.addEventListener('click', () => {
+            goToStep(2);
+        });
+        
+        newAnalysisButton.addEventListener('click', () => {
+            goToStep(1);
+            audioFileInput.value = '';
+            patientIdInput.value = '';
+            currentAudioFile = null;
+            nextToAnalysisButton.disabled = true;
+            wavesurfer.empty();
+            predictionsDiv.innerHTML = '';
+        });
+
+        // Analyze Button Click Handler
+        analyzeButton.addEventListener('click', async () => {
+            if (!currentAudioFile) return;
+
+            analyzeButton.disabled = true;
+            analysisProgress.style.display = 'block';
+            predictionsDiv.innerHTML = '';
+            wavesurfer.regions.clear();
+
+            const formData = new FormData();
+            formData.append('audio', currentAudioFile);
+            
+            // Add patient ID if provided
+            const patientId = patientIdInput.value.trim();
+            if (patientId) {
+                formData.append('patient_id', patientId);
+            }
+
+            try {
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Move to results step
+                goToStep(3);
+                
+                // Display the predictions
+                displayPredictions(data.predictions);
+                
+                // Display summary information
+                if (data.summary) {
+                    const summary = data.summary;
+                    
+                    avgCrackles.innerHTML = formatProbability(summary.avg_crackles_prob);
+                    avgWheezes.innerHTML = formatProbability(summary.avg_wheezes_prob);
+                    maxCrackles.innerHTML = formatProbability(summary.max_crackles_prob);
+                    maxWheezes.innerHTML = formatProbability(summary.max_wheezes_prob);
+                    
+                    // Display diagnosis information if available
+                    if (summary.patient_id && summary.diagnosis) {
+                        patientIdDisplay.textContent = summary.patient_id;
+                        diagnosisDisplay.textContent = summary.diagnosis;
+                        diagnosisContainer.style.display = 'block';
+                        
+                        // Display diagnosis statistics if available
+                        if (data.diagnosis_stats) {
+                            cracklesPrevalence.textContent = `${Math.round(data.diagnosis_stats.crackles_prevalence * 100)}%`;
+                            wheezesPrevalence.textContent = `${Math.round(data.diagnosis_stats.wheezes_prevalence * 100)}%`;
+                            sampleCount.textContent = data.diagnosis_stats.sample_count;
+                            diagnosisStatsContainer.style.display = 'block';
+                        } else {
+                            diagnosisStatsContainer.style.display = 'none';
+                        }
+                    } else {
+                        diagnosisContainer.style.display = 'none';
+                    }
+                }
+
+            } catch (error) {
+                console.error('Error during prediction:', error);
+                predictionsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                goToStep(2); // Stay on analysis step if there's an error
+            } finally {
+                analysisProgress.style.display = 'none';
+                analyzeButton.disabled = false;
+            }
+        });
+
+        // Function to display predictions and add regions to waveform
+        function displayPredictions(predictions) {
+            let predictionHtml = '<ul>';
+            const threshold = 0.5; // Probability threshold for highlighting
+
+            predictions.forEach(pred => {
+                let result = `<li>${pred.start.toFixed(1)}s - ${pred.end.toFixed(1)}s: `;
+                let hasAbnormality = false;
+                
+                if (pred.crackles_prob > threshold) {
+                    result += ` Crackles (${(pred.crackles_prob * 100).toFixed(0)}%)`;
+                    hasAbnormality = true;
+                    
+                    // Add WaveSurfer region for crackles
+                    wavesurfer.regions.add({
+                        start: pred.start,
+                        end: pred.end,
+                        color: 'rgba(255, 0, 0, 0.3)',
+                        drag: false,
+                        resize: false
+                    });
+                }
+                
+                if (pred.wheezes_prob > threshold) {
+                    if (hasAbnormality) result += ',';
+                    result += ` Wheezes (${(pred.wheezes_prob * 100).toFixed(0)}%)`;
+                    hasAbnormality = true;
+                    
+                    // Add WaveSurfer region for wheezes if not already added for crackles
+                    if (pred.crackles_prob <= threshold) {
+                        wavesurfer.regions.add({
+                            start: pred.start,
+                            end: pred.end,
+                            color: 'rgba(0, 0, 255, 0.3)',
+                            drag: false,
+                            resize: false
+                        });
+                    }
+                }
+                
+                if (!hasAbnormality) {
+                    result += ' Normal';
+                }
+
+                result += '</li>';
+                predictionHtml += result;
+            });
+            
+            predictionHtml += '</ul>';
+            predictionsDiv.innerHTML = predictionHtml;
+        }
+
+        // Fetch and display stats
+        async function fetchAndDisplayStats() {
+             try {
+                 const response = await fetch('/stats');
+                 if (!response.ok) throw new Error('Failed to fetch stats');
+                 const stats = await response.json();
+
+                 // Create Location Chart
+                 const locCtx = document.getElementById('locationChart').getContext('2d');
+                 const locData = stats.prevalence_by_location;
+                 new Chart(locCtx, {
+                     type: 'bar',
+                     data: {
+                         labels: Object.keys(locData),
+                         datasets: [{
+                             label: 'Crackle Prevalence',
+                             data: Object.values(locData).map(d => d.crackles),
+                             backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                         }, {
+                             label: 'Wheeze Prevalence',
+                             data: Object.values(locData).map(d => d.wheezes),
+                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                         }]
+                     },
+                     options: { 
+                         plugins: {
+                             title: { 
+                                 display: true, 
+                                 text: 'Prevalence by Chest Location' 
+                             }
+                         }
+                     }
+                 });
+
+                  // Create Equipment Chart
+                 const equipCtx = document.getElementById('equipmentChart').getContext('2d');
+                 const equipData = stats.prevalence_by_equipment;
+                 new Chart(equipCtx, {
+                     type: 'bar',
+                     data: {
+                         labels: Object.keys(equipData),
+                         datasets: [{
+                             label: 'Crackle Prevalence',
+                             data: Object.values(equipData).map(d => d.crackles),
+                             backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                         }, {
+                              label: 'Wheeze Prevalence',
+                             data: Object.values(equipData).map(d => d.wheezes),
+                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                         }]
+                     },
+                     options: { 
+                         plugins: {
+                             title: { 
+                                 display: true, 
+                                 text: 'Prevalence by Equipment' 
+                             }
+                         }
+                     }
+                 });
+                 
+                 // Create Diagnosis Chart
+                 if (stats.prevalence_by_diagnosis) {
+                     const diagCtx = document.getElementById('diagnosisChart').getContext('2d');
+                     const diagData = stats.prevalence_by_diagnosis;
+                     
+                     new Chart(diagCtx, {
+                         type: 'bar',
+                         data: {
+                             labels: Object.keys(diagData),
+                             datasets: [{
+                                 label: 'Crackle Prevalence',
+                                 data: Object.values(diagData).map(d => d.crackles),
+                                 backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                             }, {
+                                 label: 'Wheeze Prevalence',
+                                 data: Object.values(diagData).map(d => d.wheezes),
+                                 backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                             }, {
+                                 type: 'line',
+                                 label: 'Sample Count',
+                                 data: Object.values(diagData).map(d => d.count ? d.count / 10 : 0), // Scale down for visibility
+                                 borderColor: 'rgba(75, 192, 192, 1)',
+                                 backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                                 yAxisID: 'y1',
+                             }]
+                         },
+                         options: { 
+                             plugins: {
+                                 title: { 
+                                     display: true, 
+                                     text: 'Prevalence by Diagnosis' 
+                                 }
+                             },
+                             scales: {
+                                 y: {
+                                     beginAtZero: true,
+                                     title: {
+                                         display: true,
+                                         text: 'Prevalence'
+                                     }
+                                 },
+                                 y1: {
+                                     beginAtZero: true,
+                                     position: 'right',
+                                     grid: {
+                                         drawOnChartArea: false
+                                     },
+                                     title: {
+                                         display: true,
+                                         text: 'Sample Count (÷10)'
+                                     }
+                                 }
+                             }
+                         }
+                     });
+                 }
+
+             } catch (error) {
+                 console.error("Failed to load stats:", error);
+                 // Optionally display an error message on the page
+             }
+         }
+
+        // Load stats when the page loads
+        fetchAndDisplayStats();
+    </script>
+
+</body>
+</html>
