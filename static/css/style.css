@@ -1,1 +1,344 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f8f9fa;
+}
 
+h1, h2, h3, h4 {
+    color: #2c3e50;
+}
+
+h1 {
+    border-bottom: 2px solid #eee;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+#waveform {
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 1em;
+    background-color: #fff;
+    height: 128px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#predictions {
+    margin-top: 1em;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#predictions ul {
+    padding-left: 20px;
+}
+
+#predictions li {
+    margin-bottom: 8px;
+}
+
+.region-crackle {
+    background-color: rgba(255, 0, 0, 0.3);
+}
+
+.region-wheeze {
+    background-color: rgba(0, 0, 255, 0.3);
+}
+
+.chart-container {
+    width: 45%;
+    display: inline-block;
+    margin-top: 1em;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-right: 4%;
+}
+
+input[type="file"], input[type="text"] {
+    margin-bottom: 10px;
+    padding: 10px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    width: 100%;
+    max-width: 400px;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+button:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
+#controls {
+    margin-bottom: 20px;
+}
+
+#loading {
+    font-weight: bold;
+    color: #e74c3c;
+    margin-left: 10px;
+    display: inline-block;
+}
+
+/* Step progress bar */
+.step-container {
+    margin-bottom: 30px;
+}
+
+.stepper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: #ccc;
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.step.active .step-number {
+    background-color: #3498db;
+}
+
+.step.completed .step-number {
+    background-color: #2ecc71;
+}
+
+.step-title {
+    font-size: 0.9em;
+    color: #666;
+    text-align: center;
+}
+
+.step.active .step-title {
+    color: #3498db;
+    font-weight: bold;
+}
+
+.step.completed .step-title {
+    color: #2ecc71;
+}
+
+.step-content {
+    display: none;
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.step-content.active {
+    display: block;
+}
+
+.step::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    left: calc(50% + 15px);
+    width: calc(100% - 30px);
+    height: 2px;
+    background-color: #ccc;
+}
+
+.step:last-child::after {
+    display: none;
+}
+
+.step.completed::after {
+    background-color: #2ecc71;
+}
+
+/* Diagnosis info box */
+.diagnosis-info {
+    background-color: #fff;
+    border-left: 4px solid #3498db;
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.diagnosis-title {
+    font-weight: bold;
+    font-size: 1.2em;
+    margin-bottom: 10px;
+    color: #2c3e50;
+}
+
+.diagnosis-details {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.diagnosis-stat {
+    margin-right: 20px;
+    margin-bottom: 10px;
+}
+
+.diagnosis-stat-label {
+    font-size: 0.9em;
+    color: #777;
+}
+
+.diagnosis-stat-value {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+}
+
+/* Results summary box */
+.results-summary {
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 20px 0;
+    border: 1px solid #ddd;
+}
+
+.summary-title {
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.summary-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+}
+
+.summary-label {
+    color: #666;
+}
+
+.summary-value {
+    font-weight: bold;
+}
+
+.summary-value.high {
+    color: #e74c3c;
+}
+
+.summary-value.medium {
+    color: #f39c12;
+}
+
+.summary-value.low {
+    color: #2ecc71;
+}
+
+/* Progress spinner */
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top: 4px solid #3498db;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.progress-message {
+    color: #3498db;
+    font-weight: bold;
+}
+
+/* Hide inactive sections */
+.analysis-container, .results-container {
+    display: none;
+}
+
+.analysis-container.active, .results-container.active {
+    display: block;
+}
+
+/* Tooltip styles */
+.tooltip {
+    position: relative;
+    display: inline-block;
+    margin-left: 5px;
+    cursor: help;
+}
+
+.tooltip .tooltip-icon {
+    background-color: #3498db;
+    color: white;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.tooltip .tooltip-text {
+    visibility: hidden;
+    width: 200px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border-radius: 5px;
+    padding: 5px;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    font-size: 0.85em;
+}
+
+.tooltip:hover .tooltip-text {
+    visibility: visible;
+    opacity: 1;
+} 
