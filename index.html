@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Respiratory Sound Analysis</title>
+    <script src="https://unpkg.com/wavesurfer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: sans-serif; }
+        #waveform { border: 1px solid #ddd; margin-bottom: 1em; }
+        #predictions { margin-top: 1em; }
+        .region-crackle { background-color: rgba(255, 0, 0, 0.3); } /* Red for crackles */
+        .region-wheeze { background-color: rgba(0, 0, 255, 0.3); } /* Blue for wheezes */
+        .chart-container { width: 45%; display: inline-block; margin-top: 1em; }
+    </style>
+</head>
+<body>
+
+    <h1>Abnormal Respiratory Sound Detector</h1>
+
+    <input type="file" id="audioFile" accept="audio/*">
+    <button id="analyzeButton" disabled>Analyze Audio</button>
+    <div id="loading" style="display: none;">Processing...</div>
+
+    <div id="waveform"></div>
+    <div id="controls">
+        <button id="playPauseButton" disabled>Play/Pause</button>
+    </div>
+
+    <h2>Predictions</h2>
+    <div id="predictions">
+        <!-- Prediction results will be shown here -->
+    </div>
+
+    <h2>Dataset Insights (Based on Training Data)</h2>
+    <div class="chart-container">
+        <canvas id="locationChart"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="equipmentChart"></canvas>
+    </div>
+
+
+    <script>
+        const audioFileInput = document.getElementById('audioFile');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const loadingDiv = document.getElementById('loading');
+        const predictionsDiv = document.getElementById('predictions');
+        const playPauseButton = document.getElementById('playPauseButton');
+        const waveformDiv = document.getElementById('waveform');
+
+        let wavesurfer = null;
+        let currentAudioFile = null;
+
+        // Initialize WaveSurfer
+        wavesurfer = WaveSurfer.create({
+            container: '#waveform',
+            waveColor: 'violet',
+            progressColor: 'purple',
+            plugins: [
+                // Consider WaveSurfer plugins like Regions for visualization
+            ]
+        });
+
+        // Enable Analyze button when a file is selected
+        audioFileInput.addEventListener('change', (event) => {
+            currentAudioFile = event.target.files[0];
+            if (currentAudioFile) {
+                analyzeButton.disabled = false;
+                playPauseButton.disabled = true; // Disable play until loaded
+                predictionsDiv.innerHTML = ''; // Clear old predictions
+                wavesurfer.empty(); // Clear old waveform
+                wavesurfer.load(URL.createObjectURL(currentAudioFile));
+            } else {
+                analyzeButton.disabled = true;
+            }
+        });
+
+        wavesurfer.on('ready', () => {
+             playPauseButton.disabled = false;
+        });
+
+         playPauseButton.addEventListener('click', () => {
+            wavesurfer.playPause();
+        });
+
+
+        // Analyze Button Click Handler
+        analyzeButton.addEventListener('click', async () => {
+            if (!currentAudioFile) return;
+
+            loadingDiv.style.display = 'block';
+            analyzeButton.disabled = true;
+            predictionsDiv.innerHTML = ''; // Clear previous results
+            // Clear previous regions if using WaveSurfer regions plugin
+             if (wavesurfer.plugins[0] && wavesurfer.plugins[0].clearRegions) {
+                wavesurfer.plugins[0].clearRegions();
+            }
+
+
+            const formData = new FormData();
+            formData.append('audio', currentAudioFile);
+
+            try {
+                const response = await fetch('/predict', { // Assuming backend runs on the same host/port
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                displayPredictions(data.predictions);
+
+            } catch (error) {
+                console.error('Error during prediction:', error);
+                predictionsDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            } finally {
+                loadingDiv.style.display = 'none';
+                analyzeButton.disabled = false; // Re-enable after analysis
+            }
+        });
+
+        // Function to display predictions and add regions to waveform
+        function displayPredictions(predictions) {
+            let predictionHtml = '<ul>';
+            const threshold = 0.5; // Probability threshold for highlighting
+
+            predictions.forEach(pred => {
+                let result = `<li>${pred.start.toFixed(1)}s - ${pred.end.toFixed(1)}s: `;
+                let hasAbnormality = false;
+                if (pred.crackles_prob > threshold) {
+                    result += ` Crackles (${(pred.crackles_prob * 100).toFixed(0)}%)`;
+                    hasAbnormality = true;
+                    // Add WaveSurfer region (requires Regions plugin)
+                    addWaveSurferRegion(pred.start, pred.end, 'region-crackle');
+                }
+                if (pred.wheezes_prob > threshold) {
+                    result += ` Wheezes (${(pred.wheezes_prob * 100).toFixed(0)}%)`;
+                     hasAbnormality = true;
+                    // Add WaveSurfer region
+                    addWaveSurferRegion(pred.start, pred.end, 'region-wheeze');
+                }
+                 if (!hasAbnormality) {
+                     result += ' Normal';
+                 }
+
+                result += '</li>';
+                predictionHtml += result;
+            });
+            predictionHtml += '</ul>';
+            predictionsDiv.innerHTML = predictionHtml;
+        }
+
+         // Helper to add regions (Placeholder - Requires WaveSurfer Regions Plugin)
+         function addWaveSurferRegion(start, end, cssClass) {
+             console.log(`Adding region: ${cssClass} from ${start} to ${end}`);
+             // Example using hypothetical regions plugin API:
+             // wavesurfer.addRegion({
+             //   start: start,
+             //   end: end,
+             //   color: cssClass === 'region-crackle' ? 'rgba(255, 0, 0, 0.3)' : 'rgba(0, 0, 255, 0.3)',
+             //   drag: false,
+             //   resize: false
+             // });
+             // For now, just log it. You'll need to integrate the actual plugin.
+             // Check WaveSurfer.js documentation for the Regions plugin.
+         }
+
+
+        // Fetch and display stats
+        async function fetchAndDisplayStats() {
+             try {
+                 const response = await fetch('/stats');
+                 if (!response.ok) throw new Error('Failed to fetch stats');
+                 const stats = await response.json();
+
+                 // Create Location Chart
+                 const locCtx = document.getElementById('locationChart').getContext('2d');
+                 const locData = stats.prevalence_by_location;
+                 new Chart(locCtx, {
+                     type: 'bar',
+                     data: {
+                         labels: Object.keys(locData),
+                         datasets: [{
+                             label: 'Crackle Prevalence',
+                             data: Object.values(locData).map(d => d.crackles),
+                             backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                         }, {
+                             label: 'Wheeze Prevalence',
+                             data: Object.values(locData).map(d => d.wheezes),
+                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                         }]
+                     },
+                     options: { title: { display: true, text: 'Prevalence by Chest Location' } }
+                 });
+
+                  // Create Equipment Chart
+                 const equipCtx = document.getElementById('equipmentChart').getContext('2d');
+                 const equipData = stats.prevalence_by_equipment;
+                  new Chart(equipCtx, {
+                     type: 'bar',
+                     data: {
+                         labels: Object.keys(equipData),
+                         datasets: [{
+                             label: 'Crackle Prevalence',
+                             data: Object.values(equipData).map(d => d.crackles),
+                             backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                         }, {
+                              label: 'Wheeze Prevalence',
+                             data: Object.values(equipData).map(d => d.wheezes),
+                             backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                         }]
+                     },
+                     options: { title: { display: true, text: 'Prevalence by Equipment' } }
+                 });
+
+             } catch (error) {
+                 console.error("Failed to load stats:", error);
+                 // Optionally display an error message on the page
+             }
+         }
+
+        // Load stats when the page loads
+        fetchAndDisplayStats();
+
+    </script>
+
+</body>
+</html>

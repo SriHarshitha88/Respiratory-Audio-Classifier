@@ -1,0 +1,6 @@
+## Dataset Directory
+ICBHI_final_database
+data/raw/audio_and_txt_files
+.DS_Store
+deprecated/
+saved_assets/*
